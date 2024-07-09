@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tetris</title>
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f0f0f0;
+        }
+        #gameBoard {
+            border: 2px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameBoard" width="240" height="400"></canvas>
+    <script>
+        const canvas = document.getElementById('gameBoard');
+        const ctx = canvas.getContext('2d');
+        const scale = 20;
+        const rows = 20;
+        const columns = 12;
+
+        // Tetromino shapes
+        const shapes = [
+            [[1, 1, 1, 1]],
+            [[1, 1], [1, 1]],
+            [[1, 1, 1], [0, 1, 0]],
+            [[1, 1, 1], [1, 0, 0]],
+            [[1, 1, 1], [0, 0, 1]],
+            [[1, 1, 0], [0, 1, 1]],
+            [[0, 1, 1], [1, 1, 0]]
+        ];
+
+        const colors = [
+            '#FF0D72', '#0DC2FF', '#0DFF72',
+            '#F538FF', '#FF8E0D', '#FFE138', '#3877FF'
+        ];
+
+        let board = Array(rows).fill().map(() => Array(columns).fill(0));
+        let score = 0;
+
+        class Piece {
+            constructor() {
+                this.shape = shapes[Math.floor(Math.random() * shapes.length)];
+                this.color = colors[Math.floor(Math.random() * colors.length)];
+                this.x = Math.floor(columns / 2) - Math.floor(this.shape[0].length / 2);
+                this.y = 0;
+            }
+
+            draw() {
+                this.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            ctx.fillStyle = this.color;
+                            ctx.fillRect((this.x + x) * scale, (this.y + y) * scale, scale, scale);
+                            ctx.strokeStyle = 'black';
+                            ctx.strokeRect((this.x + x) * scale, (this.y + y) * scale, scale, scale);
+                        }
+                    });
+                });
+            }
+
+            move(dx, dy) {
+                if (!this.collision(dx, dy)) {
+                    this.x += dx;
+                    this.y += dy;
+                } else if (dy > 0) {
+                    this.lock();
+                    piece = new Piece();
+                }
+            }
+
+            collision(dx, dy) {
+                return this.shape.some((row, y) => {
+                    return row.some((value, x) => {
+                        if (!value) return false;
+                        const newX = this.x + x + dx;
+                        const newY = this.y + y + dy;
+                        return newX < 0 || newX >= columns || newY >= rows || (newY >= 0 && board[newY][newX]);
+                    });
+                });
+            }
+
+            lock() {
+                this.shape.forEach((row, y) => {
+                    row.forEach((value, x) => {
+                        if (value) {
+                            board[this.y + y][this.x + x] = this.color;
+                        }
+                    });
+                });
+                this.clearLines();
+            }
+
+            clearLines() {
+                let linesCleared = 0;
+                outer: for (let y = rows - 1; y >= 0; y--) {
+                    for (let x = 0; x < columns; x++) {
+                        if (!board[y][x]) continue outer;
+                    }
+                    board.splice(y, 1);
+                    board.unshift(Array(columns).fill(0));
+                    linesCleared++;
+                }
+                score += linesCleared * 100;
+            }
+
+            rotate() {
+                const rotated = this.shape[0].map((_, i) => this.shape.map(row => row[i]).reverse());
+                if (!this.rotationCollision(rotated)) {
+                    this.shape = rotated;
+                }
+            }
+
+            rotationCollision(rotatedShape) {
+                return rotatedShape.some((row, y) => {
+                    return row.some((value, x) => {
+                        if (!value) return false;
+                        const newX = this.x + x;
+                        const newY = this.y + y;
+                        return newX < 0 || newX >= columns || newY >= rows || (newY >= 0 && board[newY][newX]);
+                    });
+                });
+            }
+        }
+
+        let piece = new Piece();
+        let dropCounter = 0;
+        let lastTime = 0;
+
+        function update(time = 0) {
+            const deltaTime = time - lastTime;
+            lastTime = time;
+
+            dropCounter += deltaTime;
+            if (dropCounter > 1000) {
+                piece.move(0, 1);
+                dropCounter = 0;
+            }
+
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            board.forEach((row, y) => {
+                row.forEach((value, x) => {
+                    if (value) {
+                        ctx.fillStyle = value;
+                        ctx.fillRect(x * scale, y * scale, scale, scale);
+                        ctx.strokeStyle = 'black';
+                        ctx.strokeRect(x * scale, y * scale, scale, scale);
+                    }
+                });
+            });
+
+            piece.draw();
+
+            ctx.fillStyle = 'white';
+            ctx.font = '20px Arial';
+            ctx.fillText(`Score: ${score}`, 10, 30);
+        }
+
+        document.addEventListener('keydown', event => {
+            if (event.key === 'ArrowLeft') piece.move(-1, 0);
+            if (event.key === 'ArrowRight') piece.move(1, 0);
+            if (event.key === 'ArrowDown') piece.move(0, 1);
+            if (event.key === 'ArrowUp') piece.rotate();
+        });
+
+        update();
+    </script>
+</body>
+</html>
